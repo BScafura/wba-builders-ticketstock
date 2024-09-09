@@ -1,0 +1,11 @@
+{
+    "name": "TicketStock Test",
+    "symbol": "TSTOCK",
+    "description": "A test for our capestone project",
+    "seller_fee_basis": 5,
+    "external_url": "",
+    "edition": "",
+    "background_color": "000000",
+    "image":"https://i.seadn.io/gae/QdhGPriHxyq-RoihZtMojK3UNlofkoLjmyHu9twrlxfoWGuHIe2n0YWJWylbEprod-n4qKfBTyIFXn14UmOqo4aj4yS2q5_QKXZZEQ?auto=format&dpr=1&w=1920"
+
+}
