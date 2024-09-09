@@ -1,27 +1,29 @@
 import * as anchor from "@coral-xyz/anchor";
-import { SystemProgram, Program } from "@coral-xyz/anchor";
+import { SystemProgram, Program, BN } from "@coral-xyz/anchor";
 import { WbaBuildersTicketstock } from "../target/types/wba_builders_ticketstock";
-import { BN } from "bn.js";
-import { QRCode } from 'qrcode'
-import fs from 'fs-extra';
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults"
-import { createGenericFile, createSignerFromKeypair, signerIdentity } from "@metaplex-foundation/umi"
+import { createGenericFile, createSignerFromKeypair, generateSigner, KeypairSigner, signerIdentity } from "@metaplex-foundation/umi"
 import { irysUploader } from "@metaplex-foundation/umi-uploader-irys"
 import { readFile } from "fs/promises"
 import path from 'path';  
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { QRCode} from"../tests/qr-code"
+import fs from 'fs-extra';
+import { it } from "mocha";
+import { findMasterEditionPda, findMetadataPda } from "@metaplex-foundation/mpl-token-metadata";
+
 
 describe("wba-builders-ticketstock", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   //Set the wallet
-  const wallet = provider.wallet as anchor.Wallet;
+  const wallet = provider.wallet as NodeWallet;  
   // Set the provider
   const setProvider = anchor.setProvider(provider);
   //Get Provider
   const getProvider = anchor.getProvider(); 
   //Set connection
   const connection = getProvider.connection;
-
   //Set up the program
   const program = anchor.workspace.WbaBuildersTicketstock as anchor.Program<WbaBuildersTicketstock>;
   //Set up the System Program ID
@@ -39,60 +41,16 @@ describe("wba-builders-ticketstock", () => {
   let testNFTSymbol = "TSTOCK";
   let testNFTUrl="";
 
-const QRCode = require('qrcode'); // Ensure qrcode library is installed
-//QR Code Data
-const eventId = 1;
-let testEventId = new BN(eventId);
-const dateTime = new Date();
-const status = 0; // Corresponds to Status.Unusued
-
-// Define the enum status
-enum Status {
-  Used,
-  Unusued,
-}
-
-// Combine data into a single string
-const dataString = `Event ID: ${eventId}, Date: ${dateTime.toDateString()}, Status: ${Status.Unusued}`;
-
-// Function to save the QR code image
-async function saveQRCodeImage(dataString: string, filename: string) {
-  try {
-    // Generate QR code data URL
-    const url = await QRCode.toDataURL(dataString);
-    
-    // Extract base64 data from the URL
-    const base64Data = url.split(',')[1];
-    if (base64Data) {
-      // Define the path to the assets folder
-      const assetsPath = path.join( 'assets');
-      
-      // Ensure the assets folder exists
-      await fs.ensureDir(assetsPath);
-
-      // Define the full path to save the QR code image
-      const filePath = path.join(assetsPath, filename);
-
-      // Write base64 data to a file
-      await fs.outputFile(filePath, base64Data, 'base64');
-      console.log(`QR code saved to ${filePath}`);
-    } else {
-      console.error('No base64 data found in QR code URL.');
-    }
-  } catch (error) {
-    console.error('Error generating or saving QR code:', error);
-  }
-}
-
-// Ensure correct keypair handling
-const keypair = wallet.payer as anchor.web3.Keypair;
-const secretKey = keypair.secretKey;
+  //Event Id
+  let eventId = 1;
+  let testEventId = new BN(eventId);
 
 
 // Create UMI connection for localnet
-const umi = createUmi('http://localhost:8899'); // Local Solana cluster URL
-const keypairForUmi = umi.eddsa.createKeypairFromSecretKey(new Uint8Array(secretKey));
-const signer = createSignerFromKeypair(umi, keypairForUmi);
+const umi = createUmi(connection); // Local Solana cluster URL
+let nftMint: KeypairSigner = generateSigner(umi);
+const creatorWallet = umi.eddsa.createKeypairFromSecretKey(new Uint8Array(wallet.payer.secretKey));
+const signer = createSignerFromKeypair(umi, creatorWallet);
 umi.use(irysUploader());
 umi.use(signerIdentity(signer));
 console.log(signer);
@@ -152,59 +110,61 @@ async function createUrl() {
   }
 }
 
+// Derive PDA for the Ticket account
+const [ticketPDA, ticketBump] =  anchor.web3.PublicKey.findProgramAddressSync(
+  [
+    Buffer.from("ticket"),
+    new anchor.BN(testEventId).toArrayLike(Buffer, "le", 8),
+  ],
+  SYSTEM_PROGRAM_ID
+);
+
+// Derive PDA for the Ticket Mint account
+const [ticketMintPDA, ticketMintBump] =  anchor.web3.PublicKey.findProgramAddressSync(
+  [
+    Buffer.from("ticketmint"),
+    ticketPDA.toBuffer(),
+  ],
+  ASSOCIATED_TOKEN_PROGRAM_ID
+);
+
+// Derive the ATA for the ticket
+const [ticketAtaPDA, ticketAtaBump] =  anchor.web3.PublicKey.findProgramAddressSync(
+  [
+    wallet.publicKey.toBuffer(),
+    TOKEN_PROGRAM_ID.toBuffer(),
+    ticketMintPDA.toBuffer()
+  ],
+  ASSOCIATED_TOKEN_PROGRAM_ID
+);
+
+// Derive the metadata account address
+const [metadataAddress, metadataBump] =  anchor.web3.PublicKey.findProgramAddressSync(
+  [
+    Buffer.from("metadata"),
+    new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
+    ticketMintPDA.toBuffer(),
+  ],
+  TOKEN_METADATA_PROGRAM_ID
+);
+
+// Derive the master edition account address
+const [masterEditionAddress, masterEditionBump] =  anchor.web3.PublicKey.findProgramAddressSync(
+  [
+    Buffer.from("metadata"),
+    new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
+    ticketMintPDA.toBuffer(),
+    Buffer.from("edition"),
+  ],
+  TOKEN_METADATA_PROGRAM_ID
+);
+
 it("Is initialized!", async () => {
     // Call the function to save the QR code image in the assets folder
-    await saveQRCodeImage(dataString, 'qrcode.png');
+    await QRCode();
+    let eventId = 1;
+    let testEventId = new BN(eventId);
    
-    // Derive PDA for the Ticket account
-    const [ticketPDA, ticketBump] = await anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("ticket"),
-        new anchor.BN(testEventId).toArrayLike(Buffer, "le", 8),
-      ],
-      SYSTEM_PROGRAM_ID
-    );
-
-    // Derive PDA for the Ticket Mint account
-    const [ticketMintPDA, ticketMintBump] = await anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("ticketmint"),
-        ticketPDA.toBuffer(),
-      ],
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
-    // Derive the ATA for the ticket
-    const [ticketAtaPDA, ticketAtaBump] = await anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        wallet.publicKey.toBuffer(),
-        TOKEN_PROGRAM_ID.toBuffer(),
-        ticketMintPDA.toBuffer()
-      ],
-      ASSOCIATED_TOKEN_PROGRAM_ID
-    );
-
-    // Derive the metadata account address
-    const [metadataAddress, metadataBump] = await anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
-        ticketMintPDA.toBuffer(),
-      ],
-      TOKEN_METADATA_PROGRAM_ID
-    );
-
-    // Derive the master edition account address
-    const [masterEditionAddress, masterEditionBump] = await anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("metadata"),
-        new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
-        ticketMintPDA.toBuffer(),
-        Buffer.from("edition"),
-      ],
-      TOKEN_METADATA_PROGRAM_ID
-    );
-
     console.log(`Wallet: ${wallet.publicKey}`);
     console.log(`Ticket PDA: ${ticketPDA}`);
     console.log(`Ticket Mint PDA: ${ticketMintPDA}`);
@@ -234,15 +194,20 @@ it("Is initialized!", async () => {
   }
 
     testNFTUrl = NFTUrl.toString();
+  });
 
-    // Execute the instruction to initialize the ticket
-    await program.methods.initialize(
+  it("Intialize Ticket", async () => {
+    
+    const nftMetadata = findMetadataPda(umi, {mint: nftMint.publicKey});
+    const nftEdition = findMasterEditionPda(umi, {mint: nftMint.publicKey});
+    
+    const tx = await program.methods.initialize(
       testEventId,
       testNFTUrl,
       testNFTSymbol,
       testNFTTitle,
     ).accountsPartial({
-      maker: wallet.publicKey,
+      maker: wallet.payer.publicKey,
       ticket: ticketPDA,
       systemProgram: SYSTEM_PROGRAM_ID,
       ticketMint: ticketMintPDA,
@@ -254,5 +219,8 @@ it("Is initialized!", async () => {
       metadataProgram: TOKEN_METADATA_PROGRAM_ID,
       rent: anchor.web3.SYSVAR_RENT_PUBKEY,
     }).signers([]).rpc(); // No need for additional signers since the wallet's payer is the maker
-  });
+
+  
+  })
 });
+
