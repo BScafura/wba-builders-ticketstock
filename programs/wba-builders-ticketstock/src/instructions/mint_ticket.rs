@@ -3,46 +3,38 @@ use anchor_spl::{
     associated_token:: AssociatedToken, metadata::{create_master_edition_v3, create_metadata_accounts_v3, mpl_token_metadata, CreateMasterEditionV3, CreateMetadataAccountsV3, MasterEditionAccount, Metadata, MetadataAccount}, token::{mint_to, MintTo}, token_interface::{Mint, TokenAccount, TokenInterface}
 };
 
-use crate::state::{Status, Ticket};
+use crate::{state::Ticket, Event};
 
 #[derive(Accounts)]
-#[instruction(event_id: u64)]
+#[instruction(seed: u64)]
 pub struct IssueTicket<'info> {
     // Signer ACCOUNT
     #[account(mut)]
     maker: Signer<'info>,
-
-    // Ticket ACCOUNT
-    #[account(
-        init,
-        payer = maker,
-        space = Ticket::INIT_SPACE,
-        seeds = [b"ticket", event_id.to_le_bytes().as_ref()],
-        bump,
-    )]
-    ticket: Account<'info, Ticket>,
-    system_program: Program<'info, System>,
-
+    // Event ACCOUNT
+    event_account: Account<'info, Event>,
+     // Event ACCOUNT
+    ticket_account: Account<'info, Ticket>,
     // Mint ACCOUNT
     #[account(
         init,
-        seeds = [b"ticketmint", ticket.key().as_ref()],
+        seeds = [b"ticketmint", seed.to_le_bytes().as_ref()],
         payer = maker,
         bump,
         mint::decimals = 6,
-        mint::authority = ticket,
+        mint::authority = event_account,
     )]
-    ticket_mint: Box<InterfaceAccount<'info, Mint>>,
+    mint: Box<InterfaceAccount<'info, Mint>>,
     token_program: Interface<'info, TokenInterface>,
 
     // ATA ACCOUNT
     #[account(
         init,
         payer = maker,
-        associated_token::mint = ticket_mint,
-        associated_token::authority = ticket,
+        associated_token::mint = mint,
+        associated_token::authority = event_account,
     )]
-    ticket_ata: Box<InterfaceAccount<'info, TokenAccount>>,
+    mint_ata: Box<InterfaceAccount<'info, TokenAccount>>,
     associated_token_program: Program<'info, AssociatedToken>,
 
     // Metadata ACCOUNT
@@ -51,7 +43,7 @@ pub struct IssueTicket<'info> {
         seeds = [
             b"metadata",
             metadata_program.key().as_ref(),
-            ticket_mint.key().as_ref(),
+            mint.key().as_ref(),
         ],
         seeds::program = metadata_program.key(),
         bump,
@@ -64,49 +56,39 @@ pub struct IssueTicket<'info> {
         seeds = [
             b"metadata",
             metadata_program.key().as_ref(),
-            ticket_mint.key().as_ref(),
+            mint.key().as_ref(),
             b"edition",
         ],
         seeds::program = metadata_program.key(),
         bump,
     )]
     master_edition: Box<Account<'info, MasterEditionAccount>>,
-
+    system_program: Program<'info, System>,
     metadata_program: Program<'info, Metadata>,
     rent: Sysvar<'info, Rent>
 }
 
 impl<'info> IssueTicket<'info> {
-    pub fn initialize_tickets(&mut self,  event_id: u64, metadata_uri: String, metadata_symbol: String, metadata_title: String, bumps: &IssueTicketBumps) -> Result<()> {
+    pub fn mint_ticket(&mut self, metadata_uri: String, metadata_symbol: String, metadata_title: String, bumps: &IssueTicketBumps) -> Result<()> {
         
         let uri = metadata_uri;
         let symbol = metadata_symbol;
         let title = metadata_title; 
         
-        msg!("Creating ticket account...");
-        //create ticket
-        self.ticket.set_inner(Ticket{
-            maker: self.maker.key(),
-            event_id: event_id,
-            purchase_date: Clock::get()?.slot,
-            status: Status::Unusued, 
-            bump: bumps.ticket,
-        });
-        msg!("Ticket: {}", self.ticket.key());  
-        
-        
         msg!("Minting to a Associated Token Account...");  
         //Mint to ticket_ata
         let accounts = MintTo {
-            mint: self.ticket_mint.to_account_info(),
-            to: self.ticket_ata.to_account_info(),
-            authority: self.ticket.to_account_info(),
+            mint: self.mint.to_account_info(),
+            to: self.mint_ata.to_account_info(),
+            authority: self.event_account.to_account_info(),
         };
+//todo!()
+        //The seeds need to be the same seeds of the authority
+        //let event_seed = self.event_account.seed.to_le_bytes();
 
         let seeds = &[
-            &b"ticketmint"[..],
-            &[bumps.ticket],
-            &[bumps.ticket_mint],
+            &b"event"[..],
+            &self.event_account.seed.to_le_bytes()
         ];
 
         let signer_seeds = &[&seeds[..]];
@@ -114,23 +96,29 @@ impl<'info> IssueTicket<'info> {
         let ctx = CpiContext::new_with_signer(self.token_program.to_account_info(), accounts, signer_seeds);
 
         mint_to(ctx, 1)?;
-        msg!("Mint: {}", self.ticket_mint.key());  
-        msg!("ATA Account: {}", self.ticket_ata.key());  
+        msg!("Mint: {}", self.mint.key());  
+        msg!("ATA Account: {}", self.mint_ata.key());  
         
+        let seeds = &[
+            &b"event"[..],
+            &self.event_account.seed.to_le_bytes()[..],
+            &[self.event_account.bump]
+        ];
+        let signer_seeds = &[&seeds[..]];
+
         // create metadata account
         msg!("Creating Metadata Account...");  
-         let cpi_context = CpiContext::new(
+         let cpi_context = CpiContext::new_with_signer(
             self.metadata_program.to_account_info(),
             CreateMetadataAccountsV3 {
                 metadata: self.metadata.to_account_info(),
-                mint: self.ticket_mint.to_account_info(),
-                mint_authority: self.ticket.to_account_info(),
-                update_authority: self.ticket.to_account_info(),
+                mint: self.mint.to_account_info(),
+                mint_authority: self.event_account.to_account_info(),
+                update_authority: self.event_account.to_account_info(),
                 payer: self.maker.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 rent: self.rent.to_account_info(),
-            },
-        );
+            }, signer_seeds);
 
         let data_v2 = mpl_token_metadata::types::DataV2 {
             name: title.clone(),
@@ -147,20 +135,27 @@ impl<'info> IssueTicket<'info> {
 
     
         //create master edition account
+        let seeds = &[
+            &b"event"[..],
+            &self.event_account.seed.to_le_bytes()[..],
+            &[self.event_account.bump]
+        ];
+        let signer_seeds = &[&seeds[..]];
+
         msg!("Creating Master Edition Account...");
-        let cpi_context = CpiContext::new(
+        let cpi_context = CpiContext::new_with_signer(
         self.metadata_program.to_account_info(),
         CreateMasterEditionV3 {
             edition: self.master_edition.to_account_info(),
-            mint: self.ticket_mint.to_account_info(),
-            update_authority: self.ticket.to_account_info(),
-            mint_authority: self.ticket.to_account_info(),
+            mint: self.mint.to_account_info(),
+            update_authority: self.event_account.to_account_info(),
+            mint_authority: self.event_account.to_account_info(),
             payer: self.maker.to_account_info(),
             metadata: self.metadata.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),
             rent: self.rent.to_account_info(),
-        },
+        },signer_seeds
         );
         create_master_edition_v3(cpi_context, Some(1))?;
         msg!("Master Edition Account: {}", self.master_edition.key());  

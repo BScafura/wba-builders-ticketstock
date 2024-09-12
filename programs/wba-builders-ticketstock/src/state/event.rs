@@ -11,7 +11,7 @@ pub struct Event {
     pub final_date: u64,
     pub category: Category, 
     pub avaliable_tickets: u16,
-    pub id: u64, //seed
+    pub seed: u64, //seed
     pub bump: u8,
 }
 
