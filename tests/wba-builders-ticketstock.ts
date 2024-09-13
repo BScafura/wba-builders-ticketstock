@@ -18,6 +18,7 @@ import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system";
 import base58 from "bs58";
 import { Keypair } from "@solana/web3.js";
 import { bs58 } from "@coral-xyz/anchor/dist/cjs/utils/bytes";
+import {randomBytes} from "crypto";
 
 
 
@@ -45,38 +46,38 @@ describe("wba-builders-ticketstock", () => {
 
   //Seeds
   let seed = 1;
-  let pdaSeed = new BN(seed)
+  let pdaSeed = new BN((1))
   
 //###################################### Accounts, EventId and Seeds #####################################
 
   //Derive PDA for Event Account
   const [event, _eventBump] = anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("event"), new anchor.BN(seed).toArrayLike(Buffer, "le", 8)],  // 8-byte little-endian buffer
+    [Buffer.from("event"), pdaSeed.toBuffer("le", 8)],  // 8-byte little-endian buffer
     program.programId
   );
 
     //Derive PDA for Ticket Account
-  const [ticket, _ticketBump] = anchor.web3.PublicKey.findProgramAddressSync(
+  const ticket = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("ticket"), 
       event.toBuffer(),
-      new anchor.BN(seed).toArrayLike(Buffer, "le", 8)],
+      pdaSeed.toBuffer("le", 8)],
       program.programId
-    );
+    )[0];
 
   // Derive PDA for the Ticket Mint account
 const ticketMintPDA =  anchor.web3.PublicKey.findProgramAddressSync(
   [
     Buffer.from("ticketmint"),
-    pdaSeed.toBuffer(),
+    pdaSeed.toBuffer("le", 8),
   ],
-  SYSTEM_PROGRAM_ID 
+  program.programId
 )[0];
 
 // Derive the metadata account address
 const metadataAddress =  anchor.web3.PublicKey.findProgramAddressSync(
   [
     Buffer.from("metadata"),
-    new anchor.web3.PublicKey("metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s").toBuffer(),
+    TOKEN_METADATA_PROGRAM_ID.toBuffer(),
     ticketMintPDA.toBuffer(),
   ],
   TOKEN_METADATA_PROGRAM_ID
@@ -110,17 +111,6 @@ console.log(signer);
 
 // Create a random keypair signer for the mint account using UMI
 let nftMint: KeypairSigner = generateSigner(umi);
-
-
-
-//Verify Adress
-console.log(`Wallet: ${wallet.publicKey}`);
-console.log(`Ticket PDA: ${ticket}`);
-console.log(`Event PDA: ${event}`);
-console.log(`Ticket Mint PDA: ${ticketMintPDA}`);
-console.log(`ATA Address: ${ticketMintAta}`);
-console.log(`Metadata Address: ${metadataAddress}`);
-console.log(`Master Edition Address: ${masterEditionAddress}`);
 
 
 //######################################## FUNCTIONS ################################
@@ -474,4 +464,5 @@ it("Mint ticket", async () => {
   
   })
 });
+
 

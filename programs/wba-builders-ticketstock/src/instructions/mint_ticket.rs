@@ -38,6 +38,7 @@ pub struct IssueTicket<'info> {
     associated_token_program: Program<'info, AssociatedToken>,
 
     // Metadata ACCOUNT
+    /// CHECK:
     #[account(
         mut,
         seeds = [
@@ -48,9 +49,10 @@ pub struct IssueTicket<'info> {
         seeds::program = metadata_program.key(),
         bump,
     )]
-    metadata: Box<Account<'info, MetadataAccount>>,
+    metadata: UncheckedAccount<'info>,
 
     // Master Edition ACCOUNT
+    /// CHECK:
     #[account(
         mut,
         seeds = [
@@ -62,7 +64,7 @@ pub struct IssueTicket<'info> {
         seeds::program = metadata_program.key(),
         bump,
     )]
-    master_edition: Box<Account<'info, MasterEditionAccount>>,
+    master_edition: UncheckedAccount<'info>,
     system_program: Program<'info, System>,
     metadata_program: Program<'info, Metadata>,
     rent: Sysvar<'info, Rent>
@@ -82,13 +84,14 @@ impl<'info> IssueTicket<'info> {
             to: self.mint_ata.to_account_info(),
             authority: self.event_account.to_account_info(),
         };
-//todo!()
+
         //The seeds need to be the same seeds of the authority
         //let event_seed = self.event_account.seed.to_le_bytes();
 
         let seeds = &[
-            &b"event"[..],
-            &self.event_account.seed.to_le_bytes()
+            b"event",
+            &self.event_account.seed.to_le_bytes()[..],
+            &[self.event_account.bump]
         ];
 
         let signer_seeds = &[&seeds[..]];
@@ -100,7 +103,7 @@ impl<'info> IssueTicket<'info> {
         msg!("ATA Account: {}", self.mint_ata.key());  
         
         let seeds = &[
-            &b"event"[..],
+            b"event",
             &self.event_account.seed.to_le_bytes()[..],
             &[self.event_account.bump]
         ];
@@ -136,7 +139,7 @@ impl<'info> IssueTicket<'info> {
     
         //create master edition account
         let seeds = &[
-            &b"event"[..],
+            b"event",
             &self.event_account.seed.to_le_bytes()[..],
             &[self.event_account.bump]
         ];
