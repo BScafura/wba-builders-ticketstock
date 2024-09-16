@@ -10,7 +10,7 @@ use crate::{state::Ticket, Event};
 pub struct IssueTicket<'info> {
     // Signer ACCOUNT
     #[account(mut)]
-    maker: Signer<'info>,
+    user: Signer<'info>,
     // Event ACCOUNT
     event_account: Account<'info, Event>,
      // Event ACCOUNT
@@ -19,7 +19,7 @@ pub struct IssueTicket<'info> {
     #[account(
         init,
         seeds = [b"ticketmint", seed.to_le_bytes().as_ref()],
-        payer = maker,
+        payer = user,
         bump,
         mint::decimals = 6,
         mint::authority = event_account,
@@ -30,7 +30,7 @@ pub struct IssueTicket<'info> {
     // ATA ACCOUNT
     #[account(
         init,
-        payer = maker,
+        payer = user,
         associated_token::mint = mint,
         associated_token::authority = event_account,
     )]
@@ -118,7 +118,7 @@ impl<'info> IssueTicket<'info> {
                 mint: self.mint.to_account_info(),
                 mint_authority: self.event_account.to_account_info(),
                 update_authority: self.event_account.to_account_info(),
-                payer: self.maker.to_account_info(),
+                payer: self.user.to_account_info(),
                 system_program: self.system_program.to_account_info(),
                 rent: self.rent.to_account_info(),
             }, signer_seeds);
@@ -153,7 +153,7 @@ impl<'info> IssueTicket<'info> {
             mint: self.mint.to_account_info(),
             update_authority: self.event_account.to_account_info(),
             mint_authority: self.event_account.to_account_info(),
-            payer: self.maker.to_account_info(),
+            payer: self.user.to_account_info(),
             metadata: self.metadata.to_account_info(),
             token_program: self.token_program.to_account_info(),
             system_program: self.system_program.to_account_info(),

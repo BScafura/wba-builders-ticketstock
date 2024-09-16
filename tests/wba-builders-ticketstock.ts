@@ -441,6 +441,7 @@ it("Should create an NFT", async () => {
 
 it("Mint ticket", async () => {
     //const mintAta = getAssociatedTokenAddressSync(new anchor.web3.PublicKey(nftMint.publicKey as PublicKey), provider.wallet.publicKey);
+    
     let metadataUri = await MetadataUri();
     //const nftMetadata = findMetadataPda(umi, {mint: nftMint.publicKey});
     //const nftEdition = findMasterEditionPda(umi, {mint: nftMint.publicKey});
