@@ -12,7 +12,7 @@ import { QRCode} from"../tests/qr-code"
 import fs from 'fs-extra';
 import { it } from "mocha";
 import { ASSOCIATED_TOKEN_PROGRAM_ID, TOKEN_PROGRAM_ID, createMint, getAssociatedTokenAddressSync} from "@solana/spl-token";
-import { createMetadataAccountV3, CreateMetadataAccountV3InstructionAccounts, CreateMetadataAccountV3InstructionArgs, createNft, createV1, DataV2Args, findMasterEditionPda, findMetadataPda, mplTokenMetadata, TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
+import { Metadata, createMetadataAccountV3, CreateMetadataAccountV3InstructionAccounts, CreateMetadataAccountV3InstructionArgs, createNft, createV1, DataV2Args, findMasterEditionPda, findMetadataPda, mplTokenMetadata, TokenStandard } from "@metaplex-foundation/mpl-token-metadata";
 import{createRandomPayer} from "../tests/event-owner-generator"
 import { SYSTEM_PROGRAM_ID } from "@coral-xyz/anchor/dist/cjs/native/system";
 import base58 from "bs58";
@@ -30,7 +30,7 @@ describe("wba-builders-ticketstock", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   //Set the wallet
-  const wallet = provider.wallet as NodeWallet;  
+  const wallet = provider.wallet as anchor.Wallet;
   //Get Provider
   const getProvider = anchor.getProvider(); 
   //Set connection
@@ -95,8 +95,10 @@ const masterEditionAddress=  anchor.web3.PublicKey.findProgramAddressSync(
 )[0];
 
 // Derive the ATA for the ticket
-const ticketMintAta = getAssociatedTokenAddressSync(ticketMintPDA, provider.wallet.publicKey);
-
+const ticketMintAta =  anchor.utils.token.associatedAddress({
+  mint: ticketMintPDA,        // PDA of the mint
+  owner: event         // Owner of the ATA (in this case, the event account)
+});
 //############################################### UMI ###############################################
 
 // Create UMI connection for localnet
@@ -436,28 +438,52 @@ it("Should create an NFT", async () => {
   })
 
 it("Mint ticket", async () => {
-  /* let nftMint: KeypairSigner = generateSigner(umiLocal);
-  const mintAta = getAssociatedTokenAddressSync(new anchor.web3.PublicKey(nftMint.publicKey as PublicKey), provider.wallet.publicKey); */
-  
-    let metadataUri = await MetadataUri();
-    //const nftMetadata = findMetadataPda(umi, {mint: nftMint.publicKey});
-    //const nftEdition = findMasterEditionPda(umi, {mint: nftMint.publicKey});
-      const tx =  await program.methods.mintTicket(metadataUri, "TSTOCK", "TicketStock Test").accountsPartial({
-        maker: provider.wallet.publicKey,
-        eventAccount: event,
-        ticketAccount: ticket,
-        mint: ticketMintPDA,
-        systemProgram: SYSTEM_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        mintAta: ticketMintAta,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        metadata: metadataAddress,
-        masterEdition: masterEditionAddress,
-        metadataProgram: TOKEN_METADATA_PROGRAM_ID,
-        rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-      }).rpc(); 
+  try {
+  let nftMint: KeypairSigner = generateSigner(umiLocal);
+  const mintAta = getAssociatedTokenAddressSync(new anchor.web3.PublicKey(nftMint.publicKey as PublicKey), provider.wallet.publicKey); 
 
-      console.log("Ticket minted with transaction signature:", tx);
+  let metadataUri = await MetadataUri();
+  const nftMetadata = findMetadataPda(umiLocal, {mint: nftMint.publicKey});
+  const nftEdition = findMasterEditionPda(umiLocal, {mint: nftMint.publicKey});
+    const tx =  await program.methods.mintTicket(pdaSeed, metadataUri, "TSTOCK", "TicketStock Test").accountsPartial({
+      user: wallet.publicKey,
+      eventAccount: event,
+      ticketAccount: ticket,
+      mint: ticketMintPDA,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      mintAta: ticketMintAta,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      metadata: metadataAddress,
+      masterEdition: masterEditionAddress,
+      systemProgram: SYSTEM_PROGRAM_ID,
+      metadataProgram: TOKEN_METADATA_PROGRAM_ID,
+      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+    }).rpc(); 
+
+    console.log("Ticket minted with transaction signature:", tx);
+  } catch (error) {
+        console.log(error);
+        console.log(wallet.publicKey);
+        console.log(event)
+        console.log(ticket)
+        console.log(ticketMintPDA)
+        console.log(ticketMintAta)
+        console.log(metadataAddress)
+        console.log(masterEditionAddress)
+        console.log(anchor.web3.SYSVAR_RENT_PUBKEY)
+        console.log(TOKEN_METADATA_PROGRAM_ID)
+        console.log(TOKEN_PROGRAM_ID)
+        console.log(ASSOCIATED_TOKEN_PROGRAM_ID)
+        console.log(SYSTEM_PROGRAM_ID)
+        console.log(program.programId)
+        console.log(signer)
+        console.log(creatorWallet)
+        console.log(walletUmi)
+
+
+
+  }
+ 
 
   
   })

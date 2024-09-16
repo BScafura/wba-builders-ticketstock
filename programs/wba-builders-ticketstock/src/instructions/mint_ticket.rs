@@ -13,7 +13,7 @@ pub struct IssueTicket<'info> {
     user: Signer<'info>,
     // Event ACCOUNT
     event_account: Account<'info, Event>,
-     // Event ACCOUNT
+     // ticket ACCOUNT
     ticket_account: Account<'info, Ticket>,
     // Mint ACCOUNT
     #[account(
@@ -21,8 +21,9 @@ pub struct IssueTicket<'info> {
         seeds = [b"ticketmint", seed.to_le_bytes().as_ref()],
         payer = user,
         bump,
-        mint::decimals = 6,
+        mint::decimals = 0,
         mint::authority = event_account,
+        mint::freeze_authority = event_account,
     )]
     mint: Box<InterfaceAccount<'info, Mint>>,
     token_program: Interface<'info, TokenInterface>,
@@ -71,7 +72,7 @@ pub struct IssueTicket<'info> {
 }
 
 impl<'info> IssueTicket<'info> {
-    pub fn mint_ticket(&mut self, metadata_uri: String, metadata_symbol: String, metadata_title: String, bumps: &IssueTicketBumps) -> Result<()> {
+    pub fn mint_ticket(&mut self, seed: u64, metadata_uri: String, metadata_symbol: String, metadata_title: String, bumps: &IssueTicketBumps) -> Result<()> {
         
         let uri = metadata_uri;
         let symbol = metadata_symbol;

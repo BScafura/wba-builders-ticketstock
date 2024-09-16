@@ -7,6 +7,7 @@ pub use state::*;
 use anchor_lang::prelude::*;
 
 declare_id!("3HDmQAKY2wVXPEMmmQKFrDnvMw2reAAuvH5Bp715CbBe");
+
 #[program]
 pub mod wba_builders_ticketstock {
     
@@ -23,7 +24,7 @@ pub mod wba_builders_ticketstock {
         ctx.accounts.initialize_ticket(seed, &ctx.bumps)
     }
 
-    pub fn mint_ticket(ctx: Context<IssueTicket>, metadata_uri: String, metadata_symbol: String, metadata_title: String) -> Result<()> {
-        ctx.accounts.mint_ticket( metadata_uri, metadata_symbol, metadata_title, &ctx.bumps)
+    pub fn mint_ticket(ctx: Context<IssueTicket>, seed: u64, metadata_uri: String, metadata_symbol: String, metadata_title: String) -> Result<()> {
+        ctx.accounts.mint_ticket( seed, metadata_uri, metadata_symbol, metadata_title, &ctx.bumps)
     }
 }
