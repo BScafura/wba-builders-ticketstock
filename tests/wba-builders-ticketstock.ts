@@ -46,7 +46,7 @@ describe("wba-builders-ticketstock", () => {
 
   //Seeds
   let seed = 1;
-  let pdaSeed = new BN((1))
+  let pdaSeed = new anchor.BN(seed);
   
 //###################################### Accounts, EventId and Seeds #####################################
 
@@ -107,10 +107,6 @@ const signer = createSignerFromKeypair(umi, creatorWallet);
 umi.use(irysUploader());
 umi.use(signerIdentity(signer));
 console.log(signer);
-
-
-// Create a random keypair signer for the mint account using UMI
-let nftMint: KeypairSigner = generateSigner(umi);
 
 
 //######################################## FUNCTIONS ################################
@@ -440,8 +436,9 @@ it("Should create an NFT", async () => {
   })
 
 it("Mint ticket", async () => {
-    //const mintAta = getAssociatedTokenAddressSync(new anchor.web3.PublicKey(nftMint.publicKey as PublicKey), provider.wallet.publicKey);
-    
+  /* let nftMint: KeypairSigner = generateSigner(umiLocal);
+  const mintAta = getAssociatedTokenAddressSync(new anchor.web3.PublicKey(nftMint.publicKey as PublicKey), provider.wallet.publicKey); */
+  
     let metadataUri = await MetadataUri();
     //const nftMetadata = findMetadataPda(umi, {mint: nftMint.publicKey});
     //const nftEdition = findMasterEditionPda(umi, {mint: nftMint.publicKey});
